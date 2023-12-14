@@ -19,10 +19,19 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-ftp_host = secret_data.ftpurl
-ftp_user = secret_data.ftpuser
-ftp_password = secret_data.ftppass
-ftp_data_file_path = './data/ClothData.csv'
+import os
+is_prod = os.environ.get('IS_HEROKU', None)
+
+if is_prod:
+    ftp_host = os.environ.get('ftpurl')
+    ftp_user = os.environ.get('ftpuser')
+    ftp_password = os.environ.get('ftppass')
+    ftp_data_file_path = './data/ClothData.csv'
+else:
+    ftp_host = secret_data.ftpurl
+    ftp_user = secret_data.ftpuser
+    ftp_password = secret_data.ftppass
+    ftp_data_file_path = './data/ClothData.csv'
 
 def generate_plot(df):
     # Use Plotly Express to create an interactive line chart
