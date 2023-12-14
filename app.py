@@ -8,6 +8,10 @@ import csv
 import requests
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
+import secret_data
+from io import BytesIO
+from ftplib import FTP
+
 
 app = Flask(__name__)
 
@@ -15,11 +19,21 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-def generate_plot():
-    data = "./data/data.csv"
+import os
+is_prod = os.environ.get('IS_HEROKU', None)
 
-    df = pd.read_csv(data, parse_dates=['timestamp'])
+if is_prod:
+    ftp_host = os.environ.get('ftpurl')
+    ftp_user = os.environ.get('ftpuser')
+    ftp_password = os.environ.get('ftppass')
+    ftp_data_file_path = './data/ClothData.csv'
+else:
+    ftp_host = secret_data.ftpurl
+    ftp_user = secret_data.ftpuser
+    ftp_password = secret_data.ftppass
+    ftp_data_file_path = './data/ClothData.csv'
 
+def generate_plot(df):
     # Use Plotly Express to create an interactive line chart
     fig = px.line(df, x='timestamp', y='amount', color='name', title='Amount Over Time')
     fig.update_layout(xaxis_title='Timestamp', yaxis_title='Amount')
@@ -37,20 +51,9 @@ def make_request(url):
     else:
         return None
 
-def write_to_csv(data, csv_file):
-    with open(csv_file, 'a', newline='') as csvfile:
-        fieldnames = data.keys()
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-        # Check if it's the first time writing to the CSV
-        if csvfile.tell() == 0:
-            writer.writeheader()
-
-        writer.writerow(data)
 
 def update_csv():
     url = "https://rustoria.co/twitch/api/superlatives/cloth"  # Replace with your actual API URL
-    csv_file = "./data/data.csv"  # Replace with your desired CSV file name
 
     try:
         # Make a request and get JSON data
@@ -59,15 +62,35 @@ def update_csv():
         if json_data:
             # Extract the information you need from the JSON
             # Replace the following line with your actual data extraction logic
-            now = datetime.datetime.now() 
+            try:
+                now = datetime.datetime.now() 
+                with FTP(ftp_host) as ftp:
+                    ftp.login(user=ftp_user, passwd=ftp_password)
+                    
+                    # Download the data file from the FTP server
+                    buffer = BytesIO()
+                    ftp.retrbinary('RETR ' + ftp_data_file_path, buffer.write)
+                    buffer.seek(0)
+                    
+                    # Read the data directly from the buffer into a DataFrame
+                    df = pd.read_csv(buffer, encoding='utf-8')
 
-            for player_data in json_data:
-                relevant_info = {'timestamp': now, 'name': player_data["player"]["name"], "team": player_data["player"]["teamName"], "amount": player_data["acquired"]["amount"]}
-                write_to_csv(relevant_info, csv_file)
-            # Write the relevant information to the CSV file
-            
+                    for player_data in json_data:
 
-            logger.info("Data written to CSV successfully.")
+                        new_row = {'timestamp': now, 'name': player_data["player"]["name"], "team": player_data["player"]["teamName"], "amount": player_data["acquired"]["amount"]}
+                        df.loc[len(df.index)] = new_row
+                
+                    # Convert the DataFrame back to CSV format
+                    updated_data = df.to_csv(index=False)
+                    
+                    # Upload the updated data back to the FTP server
+                    ftp.storbinary('STOR ' + ftp_data_file_path, BytesIO(updated_data.encode("utf-8")))
+
+                    logger.info("Data written to CSV successfully.")
+
+
+            except Exception as e:
+                logger.error(f"Error in periodic_task: {str(e)}")
 
         else:
             logger.info("Failed to get data from the API.")
@@ -86,8 +109,23 @@ scheduler.start()
 
 @app.route('/')
 def index():
-    plot_html = generate_plot()
-    return render_template('index.html', plot_html=plot_html)
+    try:
+        with FTP(ftp_host) as ftp:
+            ftp.login(user=ftp_user, passwd=ftp_password)
+            
+            # Download the data file from the FTP server
+            buffer = BytesIO()
+            ftp.retrbinary('RETR ' + ftp_data_file_path, buffer.write)
+            buffer.seek(0)
+            
+            # Read the data directly from the buffer into a DataFrame
+            df = pd.read_csv(buffer, encoding='utf-8')
+            plot_html = generate_plot(df)
+            
+            return render_template('index.html', plot_html=plot_html)
+
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
