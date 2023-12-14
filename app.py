@@ -8,7 +8,7 @@ import csv
 import requests
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
-import secret_data
+#import secret_data
 from io import BytesIO
 from ftplib import FTP
 
@@ -28,11 +28,7 @@ if is_prod:
     ftp_user = os.environ.get('ftpuser')
     ftp_password = os.environ.get('ftppass')
     ftp_data_file_path = './data/ClothData.csv'
-else:
-    ftp_host = secret_data.ftpurl
-    ftp_user = secret_data.ftpuser
-    ftp_password = secret_data.ftppass
-    ftp_data_file_path = './data/ClothData.csv'
+
 
 def generate_plot(df):
     # Use Plotly Express to create an interactive line chart
