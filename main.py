@@ -15,6 +15,7 @@ from ftplib import FTP
 
 app = Flask(__name__)
 
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -22,7 +23,9 @@ logger = logging.getLogger(__name__)
 import os
 is_prod = os.environ.get('IS_HEROKU', None)
 
+
 if is_prod:
+    port = int(os.environ.get('PORT', 5000))
     ftp_host = os.environ.get('ftpurl')
     ftp_user = os.environ.get('ftpuser')
     ftp_password = os.environ.get('ftppass')
