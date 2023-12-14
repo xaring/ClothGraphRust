@@ -9,7 +9,7 @@ import requests
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
 import secret_data
-from io import StringIO
+from io import BytesIO
 from ftplib import FTP
 
 
@@ -24,30 +24,13 @@ ftp_user = secret_data.ftpuser
 ftp_password = secret_data.ftppass
 ftp_data_file_path = './data/ClothData.csv'
 
-def generate_plot():
-    try:
-        now = datetime.datetime.now() 
-        with FTP(ftp_host) as ftp:
-            ftp.login(user=ftp_user, passwd=ftp_password)
-            
-            # Download the data file from the FTP server
-            buffer = StringIO()
-            ftp.retrbinary('RETR ' + ftp_data_file_path, buffer.write)
-            buffer.seek(0)
-            
-            # Read the data directly from the buffer into a DataFrame
-            df = pd.read_csv(buffer, parse_dates=['timestamp'], encoding='utf-8')
-            
-            # Use Plotly Express to create an interactive line chart
-            fig = px.line(df, x='timestamp', y='amount', color='name', title='Amount Over Time')
-            fig.update_layout(xaxis_title='Timestamp', yaxis_title='Amount')
+def generate_plot(df):
+    # Use Plotly Express to create an interactive line chart
+    fig = px.line(df, x='timestamp', y='amount', color='name', title='Amount Over Time')
+    fig.update_layout(xaxis_title='Timestamp', yaxis_title='Amount')
 
-            # Convert the plot to HTML and remove the outer <div>
-            plot_html = fig.to_html(full_html=False)
-
-    except Exception as e:
-        logger.error(f"Couldnt download csv from ftp: {str(e)}")
-
+    # Convert the plot to HTML and remove the outer <div>
+    plot_html = fig.to_html(full_html=False)
 
     return plot_html
 
@@ -76,7 +59,7 @@ def update_csv():
                     ftp.login(user=ftp_user, passwd=ftp_password)
                     
                     # Download the data file from the FTP server
-                    buffer = StringIO()
+                    buffer = BytesIO()
                     ftp.retrbinary('RETR ' + ftp_data_file_path, buffer.write)
                     buffer.seek(0)
                     
@@ -84,20 +67,21 @@ def update_csv():
                     df = pd.read_csv(buffer, encoding='utf-8')
 
                     for player_data in json_data:
+
                         new_row = {'timestamp': now, 'name': player_data["player"]["name"], "team": player_data["player"]["teamName"], "amount": player_data["acquired"]["amount"]}
-                        df = df.append(new_row, ignore_index=True)
+                        df.loc[len(df.index)] = new_row
                 
                     # Convert the DataFrame back to CSV format
                     updated_data = df.to_csv(index=False)
                     
                     # Upload the updated data back to the FTP server
-                    ftp.storbinary('STOR ' + ftp_data_file_path, StringIO(updated_data))
+                    ftp.storbinary('STOR ' + ftp_data_file_path, BytesIO(updated_data.encode("utf-8")))
+
+                    logger.info("Data written to CSV successfully.")
+
 
             except Exception as e:
                 logger.error(f"Error in periodic_task: {str(e)}")
-
-
-            logger.info("Data written to CSV successfully.")
 
         else:
             logger.info("Failed to get data from the API.")
@@ -121,14 +105,15 @@ def index():
             ftp.login(user=ftp_user, passwd=ftp_password)
             
             # Download the data file from the FTP server
-            buffer = StringIO()
+            buffer = BytesIO()
             ftp.retrbinary('RETR ' + ftp_data_file_path, buffer.write)
             buffer.seek(0)
             
             # Read the data directly from the buffer into a DataFrame
             df = pd.read_csv(buffer, encoding='utf-8')
-
-        return render_template('index.html', data=df.to_html())
+            plot_html = generate_plot(df)
+            
+            return render_template('index.html', plot_html=plot_html)
 
     except Exception as e:
         return f"Error: {str(e)}"
