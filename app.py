@@ -15,6 +15,11 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+ftp_host = 'ftp.byethost3.com'
+ftp_user = 'b3_35614922'
+ftp_password = 'your_ftp_password'
+ftp_data_file_path = '/path/to/your/data_file.csv'
+
 def generate_plot():
     data = "./data/data.csv"
 
@@ -51,6 +56,8 @@ def write_to_csv(data, csv_file):
 def update_csv():
     url = "https://rustoria.co/twitch/api/superlatives/cloth"  # Replace with your actual API URL
     csv_file = "./data/data.csv"  # Replace with your desired CSV file name
+
+    
 
     try:
         # Make a request and get JSON data
