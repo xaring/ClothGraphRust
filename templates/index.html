@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <title>Interactive Line Chart</title>
+</head>
+<body>
+    <h1>Amount Over Time</h1>
+    <div id="plot"></div>
+    <script>
+        // Inject the Plotly plot HTML into the div with id "plot"
+        document.getElementById('plot').innerHTML = "{{ plot_html|safe }}";
+    </script>
+</body>
+</html>
